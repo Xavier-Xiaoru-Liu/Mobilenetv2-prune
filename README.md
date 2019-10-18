@@ -78,10 +78,10 @@ python imagenet.py \
 ```shell
 python imagenet.py \
     -a mobilenetv2 \
-    -d <path-to-ILSVRC2012-data> \
-    --weight <pretrained-pth-file> \
-    --width-mult <width-multiplier> \
-    --input-size <input-resolution> \
+    -d /home/dl/DATA/ImageNet/ILSVRC/Data/CLS-LOC \
+    --weight ./pretrained/mobilenetv2_0.5-eaa6f9ad.pth \
+    --width-mult 0.5 \
+    --input-size 224 \
     -e
 ```
 

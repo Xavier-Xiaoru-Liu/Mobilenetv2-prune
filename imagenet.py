@@ -26,7 +26,6 @@ import torchvision.models as models
 import models.imagenet as customized_models
 from utils import Bar, Logger, AverageMeter, accuracy, mkdir_p, savefig
 from utils.dataloaders import *
-from tensorboardX import SummaryWriter
 
 default_model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
@@ -59,7 +58,7 @@ parser.add_argument('--epochs', default=90, type=int, metavar='N',
                     help='number of total epochs to run')
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
-parser.add_argument('-b', '--batch-size', default=256, type=int,
+parser.add_argument('-b', '--batch-size', default=32, type=int,
                     metavar='N',
                     help='mini-batch size (default: 256), this is the total '
                          'batch size of all GPUs on the current node when '
@@ -142,10 +141,10 @@ def main():
             model.features = torch.nn.DataParallel(model.features)
             model.cuda()
         else:
-            model = torch.nn.DataParallel(model).cuda()
+            model = torch.nn.DataParallel(model, device_ids=[0]).cuda()
     else:
         model.cuda()
-        model = torch.nn.parallel.DistributedDataParallel(model)
+        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[0])
 
     # define loss function (criterion) and optimizer
     criterion = nn.CrossEntropyLoss().cuda()
@@ -208,11 +207,15 @@ def main():
         else:
             print("=> no weight found at '{}'".format(args.weight))
 
-        validate(val_loader, val_loader_len, model, criterion)
-        return
+        from xavier_lib import StatisticManager
+        manager = StatisticManager()
+        manager(model)
 
-    # visualization
-    writer = SummaryWriter(os.path.join(args.checkpoint, 'logs'))
+        validate(val_loader, val_loader_len, model, criterion)
+        manager.computer_score()
+        validate(val_loader, val_loader_len, model, criterion)
+
+        return
 
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
@@ -231,11 +234,6 @@ def main():
         # append logger file
         logger.append([lr, train_loss, val_loss, train_acc, prec1])
 
-        # tensorboardX
-        writer.add_scalar('learning rate', lr, epoch + 1)
-        writer.add_scalars('loss', {'train loss': train_loss, 'validation loss': val_loss}, epoch + 1)
-        writer.add_scalars('accuracy', {'train accuracy': train_acc, 'validation accuracy': prec1}, epoch + 1)
-
         is_best = prec1 > best_prec1
         best_prec1 = max(prec1, best_prec1)
         save_checkpoint({
@@ -249,7 +247,6 @@ def main():
     logger.close()
     logger.plot()
     savefig(os.path.join(args.checkpoint, 'log.eps'))
-    writer.close()
 
     print('Best accuracy:')
     print(best_prec1)
@@ -331,16 +328,18 @@ def validate(val_loader, val_loader_len, model, criterion):
 
         target = target.cuda(non_blocking=True)
 
-        with torch.no_grad():
+        #with torch.no_grad():
             # compute output
-            output = model(input)
-            loss = criterion(output, target)
+        output = model(input)
+        loss = criterion(output, target)
 
         # measure accuracy and record loss
         prec1, prec5 = accuracy(output, target, topk=(1, 5))
         losses.update(loss.item(), input.size(0))
         top1.update(prec1.item(), input.size(0))
         top5.update(prec5.item(), input.size(0))
+
+        loss.backward()
 
         # measure elapsed time
         batch_time.update(time.time() - end)

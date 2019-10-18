@@ -16,7 +16,7 @@ except ImportError:
     print("Please install DALI from https://www.github.com/NVIDIA/DALI to run this example.")
 
 
-class HybridTrainPipe(Pipeline):
+class HybridTrainPipe():
     def __init__(self, batch_size, num_threads, device_id, data_dir, crop, dali_cpu=False):
         super(HybridTrainPipe, self).__init__(batch_size, num_threads, device_id, seed = 12 + device_id)
         if torch.distributed.is_initialized():
@@ -66,7 +66,7 @@ class HybridTrainPipe(Pipeline):
         return [output, self.labels]
 
 
-class HybridValPipe(Pipeline):
+class HybridValPipe():
     def __init__(self, batch_size, num_threads, device_id, data_dir, crop, size):
         super(HybridValPipe, self).__init__(batch_size, num_threads, device_id, seed = 12 + device_id)
         if torch.distributed.is_initialized():
@@ -189,8 +189,8 @@ class PrefetchedWrapper(object):
 
         for next_input, next_target in loader:
             with torch.cuda.stream(stream):
-                next_input = next_input.cuda(async=True)
-                next_target = next_target.cuda(async=True)
+                next_input = next_input.cuda()
+                next_target = next_target.cuda()
                 next_input = next_input.float()
                 next_input = next_input.sub_(mean).div_(std)
 
