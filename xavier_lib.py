@@ -90,7 +90,7 @@ class InfoStruct(object):
         # this function first update [masks] in pre_forward_hook,
         # then update parameters in [bn module] or biases in the last layer
 
-        self.pre_f_cls.update_mask(self.zero_variance_masked_zero)
+        self.pre_f_cls.update_mask(self.zero_variance_masked_zero.to(torch.float))
 
         print('remove activate: ', torch.sum(self.zero_variance_masked_one))
 
