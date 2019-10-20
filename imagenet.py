@@ -212,8 +212,12 @@ def main():
         manager(model)
 
         validate(val_loader, val_loader_len, model, criterion)
-        manager.computer_score()
-        validate(val_loader, val_loader_len, model, criterion)
+        for _ in range(1000):
+            manager.computer_score()
+            manager.prune(1)
+            manager.pruning_overview()
+            manager.reset()
+            validate(val_loader, val_loader_len, model, criterion)
 
         return
 
