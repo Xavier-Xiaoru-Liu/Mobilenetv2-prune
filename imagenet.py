@@ -54,7 +54,7 @@ parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18',
                         ' (default: resnet18)')
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
-parser.add_argument('--epochs', default=90, type=int, metavar='N',
+parser.add_argument('--epochs', default=150, type=int, metavar='N',
                     help='number of total epochs to run')
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
@@ -63,11 +63,11 @@ parser.add_argument('-b', '--batch-size', default=32, type=int,
                     help='mini-batch size (default: 256), this is the total '
                          'batch size of all GPUs on the current node when '
                          'using Data Parallel or Distributed Data Parallel')
-parser.add_argument('--lr', '--learning-rate', default=0.1, type=float,
+parser.add_argument('--lr', '--learning-rate', default=0.05, type=float,
                     metavar='LR', help='initial learning rate', dest='lr')
 parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
                     help='momentum')
-parser.add_argument('--wd', '--weight-decay', default=1e-4, type=float,
+parser.add_argument('--wd', '--weight-decay', default=4e-5, type=float,
                     metavar='W', help='weight decay (default: 1e-4)',
                     dest='weight_decay')
 parser.add_argument('-p', '--print-freq', default=10, type=int,
@@ -89,7 +89,7 @@ parser.add_argument('--dist-backend', default='nccl', type=str,
 parser.add_argument('--seed', default=None, type=int,
                     help='seed for initializing training. ')
 
-parser.add_argument('--lr-decay', type=str, default='step',
+parser.add_argument('--lr-decay', type=str, default='cos',
                     help='mode for learning rate decay')
 parser.add_argument('--step', type=int, default=30,
                     help='interval for learning rate decay in step mode')
@@ -211,14 +211,16 @@ def main():
         manager = StatisticManager()
         manager(model)
 
+        train_loss, train_acc = train(train_loader, train_loader_len, model, criterion, optimizer, 150)
         validate(val_loader, val_loader_len, model, criterion)
-        for _ in range(1000):
+        for _ in range(50):
             manager.computer_score()
-            manager.prune(1)
+            manager.prune(1000)
             manager.pruning_overview()
+            for _ in range(10):
+                train(train_loader, train_loader_len, model, criterion, optimizer, 150)
             manager.reset()
             validate(val_loader, val_loader_len, model, criterion)
-
         return
 
     for epoch in range(args.start_epoch, args.epochs):

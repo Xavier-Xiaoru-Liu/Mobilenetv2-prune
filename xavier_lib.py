@@ -124,7 +124,10 @@ class InfoStruct(object):
         channel_mask[index_of_channel] = 0
 
         # update [bn]
-        connections = self.weight[:, index_of_channel, 0, 0]
+        if self.f_cls.dim == 4:
+            connections = self.weight[:, index_of_channel, 0, 0]
+        else:
+            connections = self.weight[:, index_of_channel, 0, 0]
         repair_base = connections * self.forward_mean[index_of_channel]
 
         if self.bn_module is None:
@@ -136,7 +139,10 @@ class InfoStruct(object):
             self.bn_module.running_var.data -= repair_var
 
         # update [weights]
-        self.weight[:, :, 0, 0] -= self.weight[:, :, 0, 0] * self.stack_op_for_weight[index_of_channel, :]
+        if self.f_cls.dim == 4:
+            self.weight[:, :, 0, 0] -= self.weight[:, :, 0, 0] * self.stack_op_for_weight[index_of_channel, :]
+        else:
+            self.weight[:, :] -= self.weight[:, :] * self.stack_op_for_weight[index_of_channel, :]
         self.module.weight.data = self.weight
 
         # update [scores]
@@ -181,7 +187,6 @@ class InfoStruct(object):
 
         # parameters form model
         self.weight = None
-
 
     def query_channel_num(self):
 
@@ -351,6 +356,7 @@ class StatisticManager(object):
                     the_info = info
                     index = idx
 
+            print('pruned score: ', min_score)
             the_info.prune_then_modify(index)
 
     def pruning_overview(self):
