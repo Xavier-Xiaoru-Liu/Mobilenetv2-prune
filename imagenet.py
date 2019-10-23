@@ -107,6 +107,7 @@ parser.add_argument('--width-mult', type=float, default=1.0, help='MobileNet mod
 parser.add_argument('--input-size', type=int, default=224, help='MobileNet model input resolution')
 parser.add_argument('--weight', default='', type=str, metavar='WEIGHT',
                     help='path to pretrained weight (default: none)')
+parser.add_argument('--prune', type=int, default=1)
 
 
 best_prec1 = 0
@@ -207,19 +208,25 @@ def main():
         else:
             print("=> no weight found at '{}'".format(args.weight))
 
-        from xavier_lib import StatisticManager
-        manager = StatisticManager()
-        manager(model)
+        if args.prune:
+            from xavier_lib import StatisticManager
+            manager = StatisticManager()
+            manager(model)
 
-        train_loss, train_acc = train(train_loader, train_loader_len, model, criterion, optimizer, 150)
-        validate(val_loader, val_loader_len, model, criterion)
-        for _ in range(50):
-            manager.computer_score()
-            manager.prune(1000)
-            manager.pruning_overview()
-            for _ in range(10):
-                train(train_loader, train_loader_len, model, criterion, optimizer, 150)
-            manager.reset()
+            # train_loss, train_acc = train(train_loader, train_loader_len, model, criterion, optimizer, 150)
+            validate(val_loader, val_loader_len, model, criterion)
+            for _ in range(1):
+                manager.computer_score()
+                manager.prune(200)
+                manager.pruning_overview()
+                for _ in range(0):
+                    train(train_loader, train_loader_len, model, criterion, optimizer, 150)
+                manager.reset()
+                validate(val_loader, val_loader_len, model, criterion)
+            import time
+            log_time = time.strftime("%Y-%m-%d_%H-%M-%S")
+            torch.save(model.state_dict(), './ckp_for_pruning/'+log_time+'.pth')
+        else:
             validate(val_loader, val_loader_len, model, criterion)
         return
 
