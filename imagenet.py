@@ -212,6 +212,7 @@ def main():
 
         if args.prune:
             from xavier_lib import StatisticManager
+            import time
             manager = StatisticManager()
             manager(model)
 
@@ -219,15 +220,14 @@ def main():
             validate(val_loader, val_loader_len, model, criterion)
             for _ in range(5):
                 manager.computer_score()
-                manager.prune(1000)
+                manager.prune(500)
                 manager.pruning_overview()
                 for _ in range(10):
                     train(train_loader, train_loader_len, model, criterion, optimizer, 150)
                 manager.reset()
                 validate(val_loader, val_loader_len, model, criterion)
-            import time
-            log_time = time.strftime("%Y-%m-%d_%H-%M-%S")
-            torch.save(model.state_dict(), './ckp_for_pruning/'+log_time+'.pth')
+                log_time = time.strftime("%Y-%m-%d_%H-%M-%S")
+                torch.save(model.state_dict(), './ckp_for_pruning/'+log_time+'.pth')
         else:
             validate(val_loader, val_loader_len, model, criterion)
         return

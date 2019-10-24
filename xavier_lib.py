@@ -127,7 +127,7 @@ class InfoStruct(object):
         if self.f_cls.dim == 4:
             connections = self.weight[:, index_of_channel, 0, 0]
         else:
-            connections = self.weight[:, index_of_channel, 0, 0]
+            connections = self.weight[:, index_of_channel]
         repair_base = connections * self.forward_mean[index_of_channel]
 
         if self.bn_module is None:
