@@ -190,6 +190,8 @@ def main():
     elif args.data_backend == 'dali-cpu':
         get_train_loader = get_dali_train_loader(dali_cpu=True)
         get_val_loader = get_dali_val_loader()
+    else:
+        raise ValueError
 
     train_loader, train_loader_len = get_train_loader(args.data, args.batch_size, workers=args.workers, input_size=args.input_size)
     val_loader, val_loader_len = get_val_loader(args.data, args.batch_size, workers=args.workers, input_size=args.input_size)
@@ -215,11 +217,11 @@ def main():
 
             # train_loss, train_acc = train(train_loader, train_loader_len, model, criterion, optimizer, 150)
             validate(val_loader, val_loader_len, model, criterion)
-            for _ in range(1):
+            for _ in range(5):
                 manager.computer_score()
-                manager.prune(200)
+                manager.prune(1000)
                 manager.pruning_overview()
-                for _ in range(0):
+                for _ in range(10):
                     train(train_loader, train_loader_len, model, criterion, optimizer, 150)
                 manager.reset()
                 validate(val_loader, val_loader_len, model, criterion)
