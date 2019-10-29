@@ -1,4 +1,5 @@
 import torch
+import torch.nn
 import numpy as np
 
 # Varies for different model
@@ -282,9 +283,11 @@ class PreForwardHook(object):
             self.mask = torch.nn.Parameter(torch.ones(channel_num), requires_grad=False).cuda()
         if self.dim == 4:
             modified = torch.mul(inputs[0].permute([0, 2, 3, 1]), self.mask)
-            return tuple(modified.permute([0, 3, 1, 2]), )
+            return modified.permute([0, 3, 1, 2])
         elif self.dim == 2:
-            return tuple(torch.mul(inputs[0], self.mask))
+            return torch.mul(inputs[0], self.mask)
+        else:
+            raise Exception
 
 
 class StatisticManager(object):
