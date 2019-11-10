@@ -42,6 +42,7 @@ class InfoStruct(object):
 
         # parameters form model
         self.weight = None
+        self.adjusted_weight = None
 
         # assigned before pruning
         self.bn_module = None
@@ -79,9 +80,9 @@ class InfoStruct(object):
         self.adjust_matrix = torch.mm(torch.diag(torch.sqrt(eig_value[:, 0])), eig_vec.t()).to(torch.float)
         # print('M: ', adjust_matrix.shape)
 
-        adjusted_weight = torch.norm(torch.mm(self.adjust_matrix, torch.squeeze(self.weight)), dim=0)
+        self.adjusted_weight = torch.mm(self.adjust_matrix, torch.squeeze(self.weight))
 
-        self.score = adjusted_weight * self.alpha
+        self.score = torch.sum(torch.pow(self.adjusted_weight, 2), dim=0) * self.alpha
         self.sorted_index = torch.argsort(self.score)
         # print(torch.sort(self.score)[0])
 
@@ -119,7 +120,6 @@ class InfoStruct(object):
                 return index, float(self.score[index])
 
     def prune_then_modify(self, index_of_channel):
-
         # update [mask]
         channel_mask = self.pre_f_cls.mask
         channel_mask[index_of_channel] = 0
@@ -140,13 +140,24 @@ class InfoStruct(object):
             self.bn_module.running_var.data -= repair_var
 
         # update [weights]
+        before_update = np.array(self.weight.cpu().detach())
+
+        new_aw = self.adjusted_weight - \
+                 torch.mm(self.adjusted_weight[:, index_of_channel].view(-1, 1),
+                          self.stack_op_for_weight[index_of_channel, :].view(1, -1))
+
+        new_weight = torch.mm(torch.inverse(self.adjust_matrix), new_aw)
+
         if self.f_cls.dim == 4:
-            self.weight[:, :, 0, 0] -= self.weight[:, :, 0, 0] * self.stack_op_for_weight[index_of_channel, :]
+            self.weight[:, :, 0, 0] = new_weight
         else:
-            self.weight[:, :] -= self.weight[:, :] * self.stack_op_for_weight[index_of_channel, :]
+            self.weight[:, :] = new_weight
         self.module.weight.data = self.weight
 
         # update [scores]
+        self.forward_cov[:, index_of_channel] = 0
+        self.forward_cov[index_of_channel, :] = 0
+
         channel_masked_one = torch.nn.Parameter(torch.ones(self.channel_num, dtype=torch.float)).cuda() - \
             channel_mask
         repaired_forward_cov = self.forward_cov + torch.diag(channel_masked_one).to(torch.double)
@@ -157,11 +168,13 @@ class InfoStruct(object):
 
         self.stack_op_for_weight = (f_cov_inverse.t() * repaired_alpha.view(1, -1)).t()
 
-        adjusted_weight = torch.norm(torch.mm(self.adjust_matrix, torch.squeeze(self.weight)), dim=0)
+        adjusted_weight = torch.mm(self.adjust_matrix, torch.squeeze(self.weight))
 
-        self.score = adjusted_weight * self.alpha
+        self.score = torch.sum(torch.pow(adjusted_weight, 2), dim=0) * self.alpha
         self.sorted_index = torch.argsort(self.score)
         # print(torch.sort(self.score)[0])
+
+        return repaired_forward_cov, before_update, self.adjust_matrix
 
     def reset(self):
         self.f_cls.reset()
@@ -297,6 +310,8 @@ class StatisticManager(object):
         self.name_to_statistic = {}
         self.bn_name = {}
 
+        self.tmp = [0, 0]
+
     def __call__(self, model):
 
         for name, sub_module in model.named_modules():
@@ -347,6 +362,7 @@ class StatisticManager(object):
 
             min_score = 1000
             the_info = None
+            the_name = None
             index = None
 
             for name in self.name_to_statistic:
@@ -357,10 +373,21 @@ class StatisticManager(object):
                 if score < min_score:
                     min_score = score
                     the_info = info
+                    the_name = name
                     index = idx
 
-            print('pruned score: ', min_score)
-            the_info.prune_then_modify(index)
+            print('pruned score: ', min_score, 'name: ', the_name)
+            cov, weight, adj = the_info.prune_then_modify(index)
+            if self.tmp[0] is not None:
+                if self.tmp[0] == the_name:
+                    import scipy.io as sio
+                    sio.savemat('show.mat', {'before': np.array(self.tmp[1].cpu().detach()),
+                                             'after': np.array(cov.cpu().detach()),
+                                             'weight': weight,
+                                             'adj_matrix': np.array(adj.cpu().detach())})
+                    print('save')
+            self.tmp[0] = the_name
+            self.tmp[1] = cov
 
     def pruning_overview(self):
 

@@ -222,8 +222,8 @@ def main():
                 manager.computer_score()
                 manager.prune(1300)
                 manager.pruning_overview()
-                for _ in range(30):
-                    train(train_loader, train_loader_len, model, criterion, optimizer, 150)
+                for i in range(150):
+                    train(train_loader, train_loader_len, model, criterion, optimizer, i)
                 manager.reset()
                 validate(val_loader, val_loader_len, model, criterion)
                 log_time = time.strftime("%Y-%m-%d_%H-%M-%S")
