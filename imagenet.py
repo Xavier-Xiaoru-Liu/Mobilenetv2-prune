@@ -217,7 +217,7 @@ def main():
             manager(model)
 
             # train_loss, train_acc = train(train_loader, train_loader_len, model, criterion, optimizer, 150)
-            validate(train_loader, train_loader_len, model, criterion)
+            validate(val_loader, val_loader_len, model, criterion)
             for _ in range(5):
                 manager.computer_score()
                 manager.prune(1300)

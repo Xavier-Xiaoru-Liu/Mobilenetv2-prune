@@ -78,6 +78,11 @@ class InfoStruct(object):
         eig_value, eig_vec = torch.eig(self.grad_cov, eigenvectors=True)
 
         self.adjust_matrix = torch.mm(torch.diag(torch.sqrt(eig_value[:, 0])), eig_vec.t()).to(torch.float)
+        try:
+            torch.inverse(self.adjust_matrix)
+        except:
+            print(eig_value[:, 0])
+
         # print('M: ', adjust_matrix.shape)
 
         self.adjusted_weight = torch.mm(self.adjust_matrix, torch.squeeze(self.weight))
