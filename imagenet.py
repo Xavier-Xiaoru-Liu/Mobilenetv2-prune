@@ -220,7 +220,7 @@ def main():
             validate(val_loader, val_loader_len, model, criterion)
             for _ in range(5):
                 manager.computer_score()
-                manager.prune(1300)
+                manager.prune_local(1300)
                 manager.pruning_overview()
                 for i in range(150):
                     train(train_loader, train_loader_len, model, criterion, optimizer, i)

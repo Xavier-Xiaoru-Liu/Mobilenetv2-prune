@@ -29,6 +29,7 @@ class InfoStruct(object):
         self.zero_variance_masked_zero = None
         self.zero_variance_masked_one = None
         self.alpha = None  # variance after de-correlation
+        self.sorted_alpha_index = None
         self.stack_op_for_weight = None
 
         # backward statistic
@@ -37,6 +38,7 @@ class InfoStruct(object):
         self.adjust_matrix = None
 
         # score
+        self.pure_score = None
         self.score = None
         self.sorted_index = None
 
@@ -78,12 +80,11 @@ class InfoStruct(object):
         eig_value, eig_vec = torch.eig(self.grad_cov, eigenvectors=True)
 
         self.adjust_matrix = torch.mm(torch.diag(torch.sqrt(eig_value[:, 0])), eig_vec.t()).to(torch.float)
-        try:
-            torch.inverse(self.adjust_matrix)
-        except:
-            print(eig_value[:, 0])
 
         # print('M: ', adjust_matrix.shape)
+
+        self.pure_score = torch.sum(torch.pow(torch.squeeze(self.weight), 2), dim=0) * self.alpha
+        self.sorted_alpha_index = torch.argsort(self.pure_score)
 
         self.adjusted_weight = torch.mm(self.adjust_matrix, torch.squeeze(self.weight))
 
@@ -123,6 +124,16 @@ class InfoStruct(object):
             index = int(index)
             if int(channel_mask[index]) != 0:
                 return index, float(self.score[index])
+
+    def minimum_var_score(self) -> [int, float, float]:
+        # return the score of the minimum de-correlated variance
+        # by this way, we can achieve better generality
+        channel_mask = self.pre_f_cls.mask
+
+        for index in list(np.array(self.sorted_alpha_index.cpu())):
+            index = int(index)
+            if int(channel_mask[index]) != 0:
+                return index, float(self.score[index]), float(self.pure_score[index])
 
     def prune_then_modify(self, index_of_channel):
         # update [mask]
@@ -172,6 +183,66 @@ class InfoStruct(object):
         self.alpha = repaired_alpha * channel_mask
 
         self.stack_op_for_weight = (f_cov_inverse.t() * repaired_alpha.view(1, -1)).t()
+
+        self.pure_score = torch.sum(torch.pow(torch.squeeze(self.weight), 2), dim=0) * self.alpha
+        self.sorted_alpha_index = torch.argsort(self.pure_score)
+
+        adjusted_weight = torch.mm(self.adjust_matrix, torch.squeeze(self.weight))
+
+        self.score = torch.sum(torch.pow(adjusted_weight, 2), dim=0) * self.alpha
+        self.sorted_index = torch.argsort(self.score)
+        # print(torch.sort(self.score)[0])
+
+        return repaired_forward_cov, before_update, self.adjust_matrix
+
+    def local_prune_then_modify(self, index_of_channel):
+        # update [mask]
+        channel_mask = self.pre_f_cls.mask
+        channel_mask[index_of_channel] = 0
+
+        # update [bn]
+        if self.f_cls.dim == 4:
+            connections = self.weight[:, index_of_channel, 0, 0]
+        else:
+            connections = self.weight[:, index_of_channel]
+        repair_base = connections * self.forward_mean[index_of_channel]
+
+        if self.bn_module is None:
+            print('Modify biases in', self.module)
+            self.module.bias.data -= repair_base
+        else:
+            self.bn_module.running_mean.data -= repair_base
+            repair_var = connections * self.variance[index_of_channel]
+            self.bn_module.running_var.data -= repair_var
+
+        # update [weights]
+        before_update = np.array(self.weight.cpu().detach())
+
+        new_weight = torch.squeeze(self.weight) - torch.mm(self.weight[:, index_of_channel].view(-1, 1),
+                                                           self.stack_op_for_weight[index_of_channel, :].view(1, -1))
+
+        if self.f_cls.dim == 4:
+            self.weight[:, :, 0, 0] = new_weight
+        else:
+            self.weight[:, :] = new_weight
+        self.module.weight.data = self.weight
+
+        # update [scores]
+        self.forward_cov[:, index_of_channel] = 0
+        self.forward_cov[index_of_channel, :] = 0
+
+        channel_masked_one = torch.nn.Parameter(torch.ones(self.channel_num, dtype=torch.float)).cuda() - \
+                             channel_mask
+        repaired_forward_cov = self.forward_cov + torch.diag(channel_masked_one).to(torch.double)
+
+        f_cov_inverse = repaired_forward_cov.inverse().to(torch.float)
+        repaired_alpha = torch.reciprocal(torch.diag(f_cov_inverse))
+        self.alpha = repaired_alpha * channel_mask
+
+        self.stack_op_for_weight = (f_cov_inverse.t() * repaired_alpha.view(1, -1)).t()
+
+        self.pure_score = torch.sum(torch.pow(torch.squeeze(self.weight), 2), dim=0) * self.alpha
+        self.sorted_alpha_index = torch.argsort(self.pure_score)
 
         adjusted_weight = torch.mm(self.adjust_matrix, torch.squeeze(self.weight))
 
@@ -383,6 +454,41 @@ class StatisticManager(object):
 
             print('pruned score: ', min_score, 'name: ', the_name)
             cov, weight, adj = the_info.prune_then_modify(index)
+            if self.tmp[0] is not None:
+                if self.tmp[0] == the_name:
+                    import scipy.io as sio
+                    sio.savemat('show.mat', {'before': np.array(self.tmp[1].cpu().detach()),
+                                             'after': np.array(cov.cpu().detach()),
+                                             'weight': weight,
+                                             'adj_matrix': np.array(adj.cpu().detach())})
+                    print('save')
+            self.tmp[0] = the_name
+            self.tmp[1] = cov
+
+    def prune_local(self, pruned_num):
+
+        for _ in range(pruned_num):
+
+            min_score = 1000
+            the_info = None
+            the_name = None
+            shooow = None
+            index = None
+
+            for name in self.name_to_statistic:
+
+                info = self.name_to_statistic[name]
+
+                idx, score, show = info.minimum_var_score()
+                if score < min_score:
+                    min_score = score
+                    the_info = info
+                    the_name = name
+                    index = idx
+                    shooow = show
+
+            print('pruned score: ', min_score, 'name: ', the_name, 'pure score: ', shooow, 'index: ', index)
+            cov, weight, adj = the_info.local_prune_then_modify(index)
             if self.tmp[0] is not None:
                 if self.tmp[0] == the_name:
                     import scipy.io as sio
