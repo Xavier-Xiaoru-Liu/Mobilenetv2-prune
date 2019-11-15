@@ -218,12 +218,12 @@ def main():
 
             # train_loss, train_acc = train(train_loader, train_loader_len, model, criterion, optimizer, 150)
             validate(val_loader, val_loader_len, model, criterion)
-            for _ in range(5):
+            for _ in range(1):
                 manager.computer_score()
                 manager.prune_local(1300)
                 manager.pruning_overview()
-                for i in range(150):
-                    train(train_loader, train_loader_len, model, criterion, optimizer, i)
+                for i in range(15):
+                    train(train_loader, train_loader_len, model, criterion, optimizer, i*10)
                 manager.reset()
                 validate(val_loader, val_loader_len, model, criterion)
                 log_time = time.strftime("%Y-%m-%d_%H-%M-%S")
