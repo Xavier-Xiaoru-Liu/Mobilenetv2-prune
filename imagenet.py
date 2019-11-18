@@ -220,10 +220,11 @@ def main():
             validate(val_loader, val_loader_len, model, criterion)
             for _ in range(1):
                 manager.computer_score()
-                manager.prune_local(1300)
+                manager.prune_local(200)
                 manager.pruning_overview()
-                for i in range(15):
-                    train(train_loader, train_loader_len, model, criterion, optimizer, i*10)
+                validate(val_loader, val_loader_len, model, criterion)
+                for i in range(30):
+                    train(train_loader, train_loader_len, model, criterion, optimizer, i*5)
                 manager.reset()
                 validate(val_loader, val_loader_len, model, criterion)
                 log_time = time.strftime("%Y-%m-%d_%H-%M-%S")
