@@ -2,6 +2,7 @@ import torch
 import torch.nn
 import numpy as np
 
+
 # Varies for different model
 # mapping the name of conv to its corresponding bn
 def mapping(conv_name):
@@ -81,13 +82,11 @@ class InfoStruct(object):
 
         self.adjust_matrix = torch.mm(torch.diag(torch.sqrt(eig_value[:, 0])), eig_vec.t()).to(torch.float)
         compare = torch.mm(torch.diag(torch.sqrt(eig_value[:, 0])), eig_vec.t())
-        print('M: ', list(self.adjust_matrix.shape)[0] - float(torch.matrix_rank(self.adjust_matrix)))
-        print('Md: ', list(self.adjust_matrix.shape)[0] - float(torch.matrix_rank(compare)))
+        print(self.f_cls.name)
+        print('var', torch.sign(torch.diag(self.forward_cov)))
         vars = torch.abs(torch.sign(torch.diag(self.grad_cov)))
         summm = torch.abs(torch.sign(self.grad_mean))
         print('mask', vars+summm)
-        print('mean', self.forward_mean)
-        print('var', torch.diag(self.forward_cov))
 
         self.pure_score = torch.sum(torch.pow(torch.squeeze(self.weight), 2), dim=0) * self.alpha
         self.sorted_alpha_index = torch.argsort(self.pure_score)
