@@ -366,20 +366,19 @@ class BackwardStatisticHook(object):
 
 class PreForwardHook(object):
 
-    def __init__(self, name, dim=4):
+    def __init__(self, name, module, dim=4):
         self.name = name
-        self.dim=dim
-        self.mask = None
+        self.dim = dim
+        channel_num = module.in_channels
+        module.register_buffer('pre_forward_mask', torch.ones(channel_num))
+        self.mask = module.pre_forward_mask
 
     def __call__(self, module, inputs):
-        channel_num = list(inputs[0].shape)[1]
-        if self.mask is None:
-            self.mask = torch.nn.Parameter(torch.ones(channel_num), requires_grad=False).cuda()
         if self.dim == 4:
-            modified = torch.mul(inputs[0].permute([0, 2, 3, 1]), self.mask)
+            modified = torch.mul(inputs[0].permute([0, 2, 3, 1]), module.pre_forward_mask)
             return modified.permute([0, 3, 1, 2])
         elif self.dim == 2:
-            return torch.mul(inputs[0], self.mask)
+            return torch.mul(inputs[0], module.pre_forward_mask)
         else:
             raise Exception
 
@@ -399,7 +398,7 @@ class StatisticManager(object):
 
             if isinstance(sub_module, torch.nn.Conv2d):
                 if sub_module.kernel_size[0] == 1:
-                    pre_hook_cls = PreForwardHook(name)
+                    pre_hook_cls = PreForwardHook(name, sub_module)
                     hook_cls = ForwardStatisticHook(name)
                     back_hook_cls = BackwardStatisticHook(name)
                     sub_module.register_forward_pre_hook(pre_hook_cls)
@@ -409,7 +408,7 @@ class StatisticManager(object):
                 # print('conv', name)
 
             elif isinstance(sub_module, torch.nn.Linear):
-                pre_hook_cls = PreForwardHook(name, dim=2)
+                pre_hook_cls = PreForwardHook(name, sub_module, dim=2)
                 hook_cls = ForwardStatisticHook(name, dim=2)
                 back_hook_cls = BackwardStatisticHook(name, dim=2)
                 sub_module.register_forward_pre_hook(pre_hook_cls)

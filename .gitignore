@@ -1,4 +1,3 @@
-pretrained/
 show.mat
 test.py
 ckp_for_pruning/
