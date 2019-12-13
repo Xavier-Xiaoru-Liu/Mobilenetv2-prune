@@ -211,7 +211,7 @@ def main():
                 if k[:7] != 'module.':
                     k = 'module.' + k
                 target_state[k] = v
-            model.load_state_dict(target_state)
+            model.load_state_dict(target_state, strict=False)
         else:
             print("=> no weight found at '{}'".format(args.weight))
 
