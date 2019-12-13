@@ -369,7 +369,10 @@ class PreForwardHook(object):
     def __init__(self, name, module, dim=4):
         self.name = name
         self.dim = dim
-        channel_num = module.in_channels
+        if dim == 4:
+            channel_num = module.in_channels
+        else:
+            channel_num = module.in_features
         module.register_buffer('pre_forward_mask', torch.ones(channel_num))
         self.mask = module.pre_forward_mask
 
