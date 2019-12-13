@@ -364,17 +364,16 @@ class BackwardStatisticHook(object):
         self.counter = None
 
 
-class PreForwardHook(object):
+class PreForwardHook(torch.nn.Module):
 
-    def __init__(self, name, dim=4):
+    def __init__(self, name, channel_num, dim=4):
+        super(PreForwardHook, self).__init__()
         self.name = name
-        self.dim=dim
-        self.mask = None
+        self.dim = dim
+        self.channel_num = channel_num
+        self.mask = torch.ones(channel_num).cuda()
 
-    def __call__(self, module, inputs):
-        channel_num = list(inputs[0].shape)[1]
-        if self.mask is None:
-            self.mask = torch.nn.Parameter(torch.ones(channel_num), requires_grad=False).cuda()
+    def forward(self, module, inputs):
         if self.dim == 4:
             modified = torch.mul(inputs[0].permute([0, 2, 3, 1]), self.mask)
             return modified.permute([0, 3, 1, 2])
@@ -399,7 +398,8 @@ class StatisticManager(object):
 
             if isinstance(sub_module, torch.nn.Conv2d):
                 if sub_module.kernel_size[0] == 1:
-                    pre_hook_cls = PreForwardHook(name)
+                    pre_hook_cls = PreForwardHook(name, sub_module.in_channels)
+                    sub_module.add_module('pre_hook', pre_hook_cls)
                     hook_cls = ForwardStatisticHook(name)
                     back_hook_cls = BackwardStatisticHook(name)
                     sub_module.register_forward_pre_hook(pre_hook_cls)
@@ -409,7 +409,8 @@ class StatisticManager(object):
                 # print('conv', name)
 
             elif isinstance(sub_module, torch.nn.Linear):
-                pre_hook_cls = PreForwardHook(name, dim=2)
+                pre_hook_cls = PreForwardHook(name, sub_module.in_features, dim=2)
+                sub_module.add_module('pre_hook', pre_hook_cls)
                 hook_cls = ForwardStatisticHook(name, dim=2)
                 back_hook_cls = BackwardStatisticHook(name, dim=2)
                 sub_module.register_forward_pre_hook(pre_hook_cls)

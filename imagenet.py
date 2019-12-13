@@ -137,6 +137,12 @@ def main():
     print("=> creating model '{}'".format(args.arch))
     model = models.__dict__[args.arch](width_mult=args.width_mult)
 
+    if args.prune:
+        from xavier_lib import StatisticManager
+        import time
+        manager = StatisticManager()
+        manager(model)
+
     if not args.distributed:
         if args.arch.startswith('alexnet') or args.arch.startswith('vgg'):
             model.features = torch.nn.DataParallel(model.features)
@@ -177,7 +183,6 @@ def main():
         logger = Logger(os.path.join(args.checkpoint, 'log.txt'), title=title)
         logger.set_names(['Learning Rate', 'Train Loss', 'Valid Loss', 'Train Acc.', 'Valid Acc.'])
 
-
     cudnn.benchmark = True
 
     # Data loading code
@@ -211,10 +216,6 @@ def main():
             print("=> no weight found at '{}'".format(args.weight))
 
         if args.prune:
-            from xavier_lib import StatisticManager
-            import time
-            manager = StatisticManager()
-            manager(model)
 
             # train_loss, train_acc = train(train_loader, train_loader_len, model, criterion, optimizer, 150)
             validate(val_loader, val_loader_len, model, criterion)
