@@ -371,7 +371,8 @@ class PreForwardHook(torch.nn.Module):
         self.name = name
         self.dim = dim
         self.channel_num = channel_num
-        self.mask = torch.nn.Parameter(torch.ones(channel_num), requires_grad=False)
+        self.register_buffer('mask', torch.ones(channel_num))
+        #self.mask = torch.nn.Parameter(torch.ones(channel_num), requires_grad=False)
 
     def forward(self, module, inputs):
         if self.dim == 4:
