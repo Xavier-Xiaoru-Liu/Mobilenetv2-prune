@@ -567,11 +567,9 @@ class MaskManager(object):
 
             if isinstance(sub_module, torch.nn.Conv2d):
                 if sub_module.kernel_size[0] == 1:
-                    pre_hook_cls = PreForwardHook(name, sub_module.in_channels)
-                    sub_module.add_module('pre_hook', pre_hook_cls)
-                    sub_module.register_forward_pre_hook(pre_hook_cls)
+                    sub_module.add_module('pre_hook', PreForwardHook(name, sub_module.in_channels))
+                    sub_module.register_forward_pre_hook(sub_module.pre_hook)
 
             elif isinstance(sub_module, torch.nn.Linear):
-                pre_hook_cls = PreForwardHook(name, sub_module.in_features, dim=2)
-                sub_module.add_module('pre_hook', pre_hook_cls)
-                sub_module.register_forward_pre_hook(pre_hook_cls)
+                sub_module.add_module('pre_hook', PreForwardHook(name, sub_module.in_features, dim=2))
+                sub_module.register_forward_pre_hook(sub_module.pre_hook)
