@@ -554,3 +554,24 @@ class StatisticManager(object):
             if i > 150:
                 break
         plt.show()
+
+
+class MaskManager(object):
+
+    def __init__(self):
+        pass
+
+    def __call__(self, model):
+
+        for name, sub_module in model.named_modules():
+
+            if isinstance(sub_module, torch.nn.Conv2d):
+                if sub_module.kernel_size[0] == 1:
+                    pre_hook_cls = PreForwardHook(name, sub_module.in_channels)
+                    sub_module.add_module('pre_hook', pre_hook_cls)
+                    sub_module.register_forward_pre_hook(pre_hook_cls)
+
+            elif isinstance(sub_module, torch.nn.Linear):
+                pre_hook_cls = PreForwardHook(name, sub_module.in_features, dim=2)
+                sub_module.add_module('pre_hook', pre_hook_cls)
+                sub_module.register_forward_pre_hook(pre_hook_cls)

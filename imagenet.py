@@ -107,7 +107,9 @@ parser.add_argument('--width-mult', type=float, default=1.0, help='MobileNet mod
 parser.add_argument('--input-size', type=int, default=224, help='MobileNet model input resolution')
 parser.add_argument('--weight', default='', type=str, metavar='WEIGHT',
                     help='path to pretrained weight (default: none)')
-parser.add_argument('--status', type=str, default='test',help='Must be test or train or prune')
+
+parser.add_argument('--status', type=str, default='test', help='Must be test, prune or train')
+parser.add_argument('--ckp_out', type=str, default='./checkpoints/test.pth')
 
 
 best_prec1 = 0
@@ -137,10 +139,13 @@ def main():
     print("=> creating model '{}'".format(args.arch))
     model = models.__dict__[args.arch](width_mult=args.width_mult)
 
-    if args.prune:
+    if args.status == 'prune':
         from xavier_lib import StatisticManager
-        import time
         manager = StatisticManager()
+        manager(model)
+    elif args.status == 'train':
+        from xavier_lib import MaskManager
+        manager = MaskManager()
         manager(model)
 
     if not args.distributed:
@@ -215,23 +220,22 @@ def main():
         else:
             print("=> no weight found at '{}'".format(args.weight))
 
-        if args.prune:
-
+        if args.status == 'prune':
             # train_loss, train_acc = train(train_loader, train_loader_len, model, criterion, optimizer, 150)
             validate(val_loader, val_loader_len, model, criterion)
-            for _ in range(1):
-                manager.computer_score()
-                manager.prune_local(200)
-                manager.pruning_overview()
-                validate(val_loader, val_loader_len, model, criterion)
-                for i in range(30):
-                    train(train_loader, train_loader_len, model, criterion, optimizer, i*5)
-                manager.reset()
-                validate(val_loader, val_loader_len, model, criterion)
-                log_time = time.strftime("%Y-%m-%d_%H-%M-%S")
-                torch.save(model.state_dict(), './ckp_for_pruning/'+log_time+'.pth')
-        else:
+            manager.computer_score()
+            manager.prune_local(200)
+            manager.pruning_overview()
             validate(val_loader, val_loader_len, model, criterion)
+            torch.save(model.state_dict(), args.ckp_out)
+        elif args.status == 'train':
+            for i in range(30):
+                train(train_loader, train_loader_len, model, criterion, optimizer, i * 5)
+            validate(val_loader, val_loader_len, model, criterion)
+            torch.save(model.state_dict(), args.ckp_out)
+        elif args.status == 'test':
+            validate(val_loader, val_loader_len, model, criterion)
+
         return
 
     for epoch in range(args.start_epoch, args.epochs):
