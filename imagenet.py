@@ -107,7 +107,7 @@ parser.add_argument('--width-mult', type=float, default=1.0, help='MobileNet mod
 parser.add_argument('--input-size', type=int, default=224, help='MobileNet model input resolution')
 parser.add_argument('--weight', default='', type=str, metavar='WEIGHT',
                     help='path to pretrained weight (default: none)')
-parser.add_argument('--prune', type=int, default=1)
+parser.add_argument('--status', type=str, default='test',help='Must be test or train or prune')
 
 
 best_prec1 = 0
